@@ -1,7 +1,8 @@
-import { S3, SQS } from "aws-sdk";
+import { DynamoDB, S3, SQS } from "aws-sdk";
+import { GetItemInput } from "aws-sdk/clients/dynamodb";
 import fs from "fs";
-const dotenv = require("dotenv")
-dotenv.config()
+const dotenv = require("dotenv");
+dotenv.config();
 
 const s3 = new S3({
   accessKeyId: process.env.AWS_ACCESS_KEY_ID,
@@ -13,29 +14,60 @@ export const uploadFile = async (fileName: string, localFilePath: string) => {
   const response = await s3
     .upload({
       Body: fileContent,
-      Bucket: "deploy-drive",
+      Bucket: process.env.S3_BUCKET!,
       Key: fileName,
     })
     .promise();
-
-  console.log(response);
 };
 
 const sqs = new SQS({
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-    region: process.env.S3_REGION
-})
+  accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+  secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+  region: process.env.S3_REGION,
+});
 
-export const sendMessageToQueue = async (id:string)=>{
-    const params = {
-        MessageBody: JSON.stringify({
-            uploadId: id
-        }),
-        MessageGroupId: "upload-service-response",
-        QueueUrl: "https://sqs.us-east-1.amazonaws.com/512110725800/DeployDrive_BuildQueue.fifo",
-    }
+export const sendMessageToQueue = async (id: string) => {
+  const params = {
+    MessageBody: JSON.stringify({
+      uploadId: id,
+    }),
+    MessageGroupId: "upload-service-response",
+    QueueUrl: process.env.SQS_URL!,
+  };
 
-    await sqs.sendMessage(params).promise();
+  await sqs.sendMessage(params).promise();
+};
 
-}
+const dynamoDB = new DynamoDB({
+  accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+  secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+  region: process.env.S3_REGION,
+});
+
+export const updateStatusInDB = async (id: string) => {
+  const params = {
+    TableName: process.env.DYNAMO_DB_TABLE_NAME!,
+    Item: {
+      id: { S: id },
+      status: { S: "uploaded" },
+      createdAt: { S: new Date().toISOString() },
+    },
+  };
+
+  const response = await dynamoDB.putItem(params).promise();
+  return response;
+};
+
+export const getStatusFromDB = async (id: string) => {
+  const params: GetItemInput = {
+    TableName: process.env.DYNAMO_DB_TABLE_NAME!,
+    Key: {
+      id: {
+        S: id,
+      },
+    },
+  };
+  
+  const res = await dynamoDB.getItem(params).promise();
+  return res.Item!.status
+};

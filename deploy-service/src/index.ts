@@ -1,11 +1,14 @@
 import { SQSClient } from "@aws-sdk/client-sqs";
 import { Message } from "aws-sdk/clients/sqs";
 import { Consumer } from "sqs-consumer";
-import { downloadFilesFromS3, updateStatusInDB, uploadFinalDist } from "./utils/aws";
+import {
+  downloadFilesFromS3,
+  updateStatusInDB,
+  uploadFinalDist,
+} from "./utils/aws";
 import { buildProject } from "./utils/build_process";
 const dotenv = require("dotenv");
 dotenv.config();
-
 
 const createConsumer = function (
   queueUrl: string,
@@ -28,20 +31,23 @@ const createConsumer = function (
 
 const messageHandle = async (messages: Message[]) => {
   // process messages in this function
-  console.log(messages[0].Body);
   const body = messages[0].Body;
+  console.log(body);
+
   if (body) {
     const id = JSON.parse(body).uploadId;
+    const subDirectory = JSON.parse(body).subDirectory;
+    const buildCommand = JSON.parse(body).buildCommand;
+    const outputDirectory = JSON.parse(body).outputDirectory;
     console.log("parsed body");
     await downloadFilesFromS3(id);
     console.log("files downloaded from s3");
-    await buildProject(id);
+    await buildProject(id, subDirectory, buildCommand);
     console.log("build process finished");
-    uploadFinalDist(id);
+    uploadFinalDist(id, subDirectory, outputDirectory);
     console.log("uploaded dist to S3");
-    await updateStatusInDB(id)
-    console.log("updated status")
-
+    await updateStatusInDB(id);
+    console.log("updated status");
   }
 };
 

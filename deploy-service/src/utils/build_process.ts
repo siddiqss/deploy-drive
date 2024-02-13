@@ -1,14 +1,34 @@
 import { exec } from "child_process";
-import path, { resolve } from "path";
+import path from "path";
 
-export const buildProject = (id: String) => {
+// child = exec(
+//   `cd ${path.join(
+//     __dirname.slice(0, __dirname.length - 6),
+//     `/output/${id}`
+//   )} && npm install && npm run build`
+// );
+
+export const buildProject = (
+  id: string,
+  subDirectory: string,
+  buildCommand: string
+) => {
+
+  
   return new Promise((resolve) => {
-    const child = exec(
-      `cd ${path.join(
-        __dirname.slice(0, __dirname.length - 6),
-        `/output/${id}`
-      )} && npm install && npm run build`
-    );
+    let child;
+    const projectPath =
+      subDirectory !== ""
+        ? path.join(
+            __dirname.slice(0, __dirname.length - 6),
+            `/output/${id}/${subDirectory}`
+          )
+        : path.join(__dirname.slice(0, __dirname.length - 6), `/output/${id}`);
+
+    const commandToRun = buildCommand !== "" ? buildCommand : "npm run build";
+    console.log(commandToRun)
+
+    child = exec(`cd ${projectPath} && npm install && ${commandToRun}`);
 
     child.stdout?.on("data", (data) => console.log(data));
 

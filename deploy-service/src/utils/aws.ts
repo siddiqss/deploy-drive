@@ -62,11 +62,29 @@ const uploadFile = async (fileName: string, localFilePath: string) => {
     .promise();
 };
 
-export const uploadFinalDist = (id: string) => {
-  const folderPath = path.join(
-    __dirname.slice(0, __dirname.length - 6),
-    `/output/${id}/dist`
-  );
+export const uploadFinalDist = (
+  id: string,
+  subDirectory: string,
+  outputDirectory: string
+) => {
+  let folderPath;
+  let baseOutputDirectory = "dist";
+
+  if (outputDirectory !== "") {
+    baseOutputDirectory = outputDirectory;
+  }
+
+  if (subDirectory !== "") {
+    folderPath = path.join(
+      __dirname.slice(0, __dirname.length - 6),
+      `/output/${id}/${subDirectory}/${baseOutputDirectory}`
+    );
+  } else {
+    folderPath = path.join(
+      __dirname.slice(0, __dirname.length - 6),
+      `/output/${id}/${baseOutputDirectory}`
+    );
+  }
 
   const allFiles = getAllFiles(folderPath);
 

@@ -17,26 +17,33 @@ app.use(cors());
 app.use(express.json());
 const port = process.env.PORT || 8000;
 
-app.post("/deploy", async (req, res) => {
+app.post("/upload", async (req, res) => {
   const id = generateId();
 
   const repoUrl = req.body.repoUrl;
+  const projectName = req.body.projectName;
+  const subDirectory = req.body.subDirectory;
+  const buildCommand = req.body.buildCommand;
+  const outputDirectory = req.body.outputDirectory;
 
   await simpleGit().clone(repoUrl, path.join(__dirname, `output/${id}`));
   const files = getAllFiles(path.join(__dirname, `output/${id}`));
-  
-  await new Promise((resolve)=>{
-    files.forEach(async (file) => {
-      // upload-service/dist/output/sqwe12/
-      // 8 represents length of string "/output/" in the path
-      await uploadFile(file.slice(__dirname.length + 8), file);
-    });
 
-    resolve("")
+  files.forEach(async (file) => {
+    // upload-service/dist/output/sqwe12/
+    // 8 represents length of string "/output/" in the path
+    await uploadFile(file.slice(__dirname.length + 8), file);
   });
 
-  await sendMessageToQueue(id);
-  await updateStatusInDB(id);
+
+  // wait for 5 seconds to upload the files to S3
+  await new Promise((resolve)=>setTimeout(resolve, 5000));
+
+  console.log("uploaded files to S3")
+  await sendMessageToQueue(id, subDirectory, buildCommand, outputDirectory);
+  console.log("sent message to queue")
+  await updateStatusInDB(id, projectName);
+  console.log("updated status")
 
   res.json({
     id,
@@ -44,11 +51,9 @@ app.post("/deploy", async (req, res) => {
 });
 
 app.get("/status", async (req, res) => {
-  const id = req.body.id
-  if (id) {
-    const status = await getStatusFromDB(id);
-    res.json(status);
-  }
+  const id = req.query.id;
+  const status = await getStatusFromDB(String(id));
+  res.json(status);
 });
 
 app.listen(port, () => {

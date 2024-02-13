@@ -26,14 +26,19 @@ const sqs = new SQS({
   region: process.env.S3_REGION,
 });
 
-export const sendMessageToQueue = async (id: string) => {
+export const sendMessageToQueue = async (id: string, subDirectory: string, buildCommand: string, outputDirectory:string) => {
   const params = {
     MessageBody: JSON.stringify({
       uploadId: id,
+      subDirectory,
+      buildCommand,
+      outputDirectory
     }),
     MessageGroupId: "upload-service-response",
     QueueUrl: process.env.SQS_URL!,
   };
+
+  console.log(params.MessageBody)
 
   await sqs.sendMessage(params).promise();
 };
@@ -44,12 +49,13 @@ const dynamoDB = new DynamoDB({
   region: process.env.S3_REGION,
 });
 
-export const updateStatusInDB = async (id: string) => {
+export const updateStatusInDB = async (id: string, projectName: string) => {
   const params = {
     TableName: process.env.DYNAMO_DB_TABLE_NAME!,
     Item: {
       id: { S: id },
       status: { S: "uploaded" },
+      project_name: { S: projectName },
       createdAt: { S: new Date().toISOString() },
     },
   };
@@ -67,7 +73,7 @@ export const getStatusFromDB = async (id: string) => {
       },
     },
   };
-  
+
   const res = await dynamoDB.getItem(params).promise();
-  return res.Item!.status
+  return res.Item!.status;
 };

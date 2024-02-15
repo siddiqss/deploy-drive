@@ -15,16 +15,18 @@ import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
-  SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
 import axios from "axios";
 import { Terminal } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { io } from "socket.io-client";
 
-const DOMAIN = "localhost:3001";
+const DOMAIN = "localhost:8000";
+const SOCKET_SERVER_URL = "http://localhost:9002"
+const API_SERVER_URL = "http://localhost:9000"
 
 export default function Home() {
   const [projectName, setProjectName] = useState<string>("");
@@ -63,28 +65,36 @@ export default function Home() {
   const handleUpload = async () => {
     if (projectName !== "" && projectUrl !== "") {
       setStatus("Uploading...");
-      const res = await axios.post("http://localhost:8000/upload", {
-        repoUrl: projectUrl,
-        projectName: projectName,
+      const res = await axios.post(`${API_SERVER_URL}/upload`, {
+        gitURL: projectUrl,
+        // projectName: projectName,
         subDirectory,
         buildCommand,
         outputDirectory
       });
       console.log(res);
-      setProjectId(res.data.id);
+      setProjectId(res.data.data.projectSlug);
 
-      setStatus(`Deploying... ${res.data.id}`);
-      const interval = setInterval(async () => {
-        const statusRes = await axios.get(
-          `http://localhost:8000/status?id=${res.data.id}`
-        );
-        if (statusRes.data.S === "deployed") {
-          clearInterval(interval);
-          setStatus(`Deployed! ${res.data.id}`);
-        }
-      }, 3000);
+      setStatus(`Deploying... ${res.data.data.projectSlug}`);
+
     }
   };
+
+  useEffect(() => {
+    const socket = io(SOCKET_SERVER_URL);
+  
+    socket.on("connect", () => {
+      socket.emit("subscribe", projectId)
+    });
+
+    socket.on("message", (data) => {
+      console.log(data)
+    });
+
+    return () => {
+      socket.disconnect();
+    };
+  }, [projectId]);
 
   return (
     <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
@@ -97,7 +107,7 @@ export default function Home() {
             <a
               className="text-green-600"
               target="_blank"
-              href={`http://${projectId}.${DOMAIN}/index.html`}
+              href={`http://${projectId}.${DOMAIN}`}
             >
               {projectId}.{DOMAIN}
             </a>

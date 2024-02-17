@@ -8,7 +8,7 @@ dotenv.config();
 
 const app = express();
 const PORT = 9000;
-const REVERSE_PROXY_DOMAIN="localhost:8000"
+const REVERSE_PROXY_DOMAIN = "localhost:8000";
 
 const ecsClient = new ECSClient({
   region: process.env.AWS_REGION,
@@ -28,7 +28,14 @@ app.use(cors());
 app.use(express.json());
 
 app.post("/upload", async (req: Request, res: Response) => {
-  const { gitURL, slug } = req.body;
+  const {
+    gitURL,
+    slug,
+    buildCommand,
+    subDirectory,
+    outputDirectory,
+    installCommand,
+  } = req.body;
   const projectSlug = slug ? slug : generateSlug();
 
   // Spin the container
@@ -58,6 +65,10 @@ app.post("/upload", async (req: Request, res: Response) => {
           environment: [
             { name: "GIT_REPOSITORY__URL", value: gitURL },
             { name: "PROJECT_ID", value: projectSlug },
+            { name: "BUILD_COMMAND", value: buildCommand },
+            { name: "SUBDIRECTORY", value: subDirectory },
+            { name: "INSTALL_COMMAND", value: installCommand },
+            { name: "OUTPUT_DIRECTORY", value: outputDirectory },
           ],
         },
       ],

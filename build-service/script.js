@@ -5,7 +5,7 @@ const { S3Client, PutObjectCommand } = require("@aws-sdk/client-s3");
 const mime = require("mime-types");
 const Redis = require("ioredis");
 const dotenv = require("dotenv");
-dotenv.config()
+dotenv.config();
 
 const redisUri = process.env.REDIS_URI;
 const publisher = new Redis(redisUri);
@@ -19,32 +19,45 @@ const s3Client = new S3Client({
 });
 
 const PROJECT_ID = process.env.PROJECT_ID;
+const BUILD_COMMAND = process.env.BUILD_COMMAND || "npm run build";
+const SUBDIRECTORY = process.env.SUBDIRECTORY;
+const OUTPUT_DIRECTORY = process.env.OUTPUT_DIRECTORY || "dist";
+const INSTALL_COMMAND = process.env.INSTALL_COMMAND || "npm install";
 
 function publishLog(log) {
-    publisher.publish(`logs:${PROJECT_ID}`, JSON.stringify({ log }))
+  publisher.publish(`logs:${PROJECT_ID}`, JSON.stringify({ log }));
 }
 
 async function init() {
   console.log("Executing script.js");
-  publishLog('Build Started...')
-  const outDirPath = path.join(__dirname, "output");
+  publishLog("Build Started...");
 
-  const p = exec(`cd ${outDirPath} && npm install && npm run build`);
+  const outDirPath =
+    SUBDIRECTORY === undefined
+      ? path.join(__dirname, "output")
+      : path.join(__dirname, "output", SUBDIRECTORY);
+
+  const p = exec(`cd ${outDirPath} && ${INSTALL_COMMAND} && ${BUILD_COMMAND}`);
 
   p.stdout.on("data", function (data) {
     console.log(data.toString());
-    publishLog(data.toString())
+    publishLog(data.toString());
   });
 
   p.stdout.on("error", function (data) {
     console.log("Error", data.toString());
-    publishLog(`error: ${data.toString()}`)
+    publishLog(`error: ${data.toString()}`);
   });
 
   p.on("close", async function () {
     console.log("Build Complete");
-    publishLog(`Build Complete`)
-    const distFolderPath = path.join(__dirname, "output", "dist");
+    publishLog(`Build Complete`);
+
+    const distFolderPath =
+      SUBDIRECTORY === undefined
+        ? path.join(__dirname, "output", OUTPUT_DIRECTORY)
+        : path.join(__dirname, "output", SUBDIRECTORY, OUTPUT_DIRECTORY);
+
     const distFolderContents = fs.readdirSync(distFolderPath, {
       recursive: true,
     });
@@ -54,7 +67,7 @@ async function init() {
       if (fs.lstatSync(filePath).isDirectory()) continue;
 
       console.log("uploading", filePath);
-      publishLog(`uploading ${file}`)
+      publishLog(`uploading ${file}`);
 
       const command = new PutObjectCommand({
         Bucket: process.env.S3_BUCKET_NAME,
@@ -64,11 +77,11 @@ async function init() {
       });
 
       await s3Client.send(command);
-      publishLog(`uploaded ${file}`)
+      publishLog(`uploaded ${file}`);
       console.log("uploaded", filePath);
     }
     console.log("Done...");
-    publishLog(`Done`)
+    publishLog(`Done`);
   });
 }
 
